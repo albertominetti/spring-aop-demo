@@ -12,6 +12,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import com.example.aopdemo.annotation.LogExecutionTime;
+import com.example.aopdemo.support.BeanLookup;
 import com.example.aopdemo.timing.TimingRecorder;
 
 /**
@@ -20,7 +21,12 @@ import com.example.aopdemo.timing.TimingRecorder;
  * value, swallow or translate exceptions, and even skip the call entirely.
  *
  * <p>POINTCUT DESIGNATOR: {@code @annotation(...)} — matches only methods that
- * carry the {@link LogExecutionTime} annotation.
+ * carry the {@link LogExecutionTime} annotation. The {@code execution(* *(..))}
+ * conjunct pins matching to method <i>execution</i> join points: under the
+ * AspectJ compiler {@code @annotation} would otherwise also match method
+ * <i>call</i> join points, advising every call site in addition to the method
+ * itself (Spring AOP only supports execution, so this changes nothing in
+ * proxy mode — but without it, weaving mode runs every advice twice).
  *
  * <p>What it does:
  * <ol>
@@ -34,7 +40,9 @@ import com.example.aopdemo.timing.TimingRecorder;
  *
  * <p>{@code @Order(1)}: lowest value = highest precedence = this aspect sits
  * <b>outermost</b> in the advice chain, so it measures the time spent inside
- * all the other aspects as well.
+ * all the other aspects as well. The same ordering is mirrored for the
+ * AspectJ compiler in {@link AspectPrecedence} (used only in compile-time
+ * weaving mode, where Spring's {@code @Order} is not consulted).
  */
 @Aspect
 @Component
@@ -43,14 +51,12 @@ public class TimingAspect {
 
     private static final Logger log = LoggerFactory.getLogger(TimingAspect.class);
 
-    private final TimingRecorder recorder;
-
-    public TimingAspect(TimingRecorder recorder) {
-        this.recorder = recorder;
-    }
-
-    @Around("@annotation(logExecutionTime)")
+    @Around("execution(* *(..)) && @annotation(logExecutionTime)")
     public Object measureExecutionTime(ProceedingJoinPoint joinPoint, LogExecutionTime logExecutionTime) throws Throwable {
+        // Collaborators are looked up (not injected): under compile-time weaving the
+        // AspectJ runtime — not Spring — instantiates this aspect, so constructor
+        // injection would leave the fields null. See BeanLookup.
+        TimingRecorder recorder = BeanLookup.get(TimingRecorder.class);
         String method = methodKey(joinPoint);
         Object[] args = joinPoint.getArgs();
 

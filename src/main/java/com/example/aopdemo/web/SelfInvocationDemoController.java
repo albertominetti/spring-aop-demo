@@ -23,7 +23,9 @@ import com.example.aopdemo.timing.TimingRecorder;
  * </ol>
  *
  * <p>That is why the response reports {@code "aspectApplied": true} for the
- * first call and {@code "aspectApplied": false} for the second.
+ * first call and {@code "aspectApplied": false} for the second — in the
+ * default proxy mode. Under compile-time weaving ({@code -Paspectj-ctw})
+ * there is no proxy to bypass, so the second call reports {@code true} too.
  */
 @RestController
 public class SelfInvocationDemoController {

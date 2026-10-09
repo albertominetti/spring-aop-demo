@@ -39,14 +39,17 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
 
+    // NOTE: the "id" name is explicit (not inferred from the parameter name)
+    // because ajc — unlike javac with -parameters — does not emit parameter
+    // name metadata, so Spring MVC could not resolve it in weaving mode.
     @GetMapping("/{id}")
-    public Order get(@PathVariable String id) {
+    public Order get(@PathVariable("id") String id) {
         return orderService.get(id);
     }
 
     /** Always fails — used to demonstrate {@code @AfterThrowing} + exception translation. */
     @GetMapping("/{id}/fail")
-    public void fail(@PathVariable String id) {
+    public void fail(@PathVariable("id") String id) {
         orderService.failOnDemand(id);
     }
 

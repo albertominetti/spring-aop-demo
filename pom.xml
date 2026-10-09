@@ -52,4 +52,58 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Opt-in AspectJ compile-time weaving (no proxies).
+             Usage: mvn -Paspectj-ctw clean verify
+             (run the app with SPRING_AOP_AUTO=false so Boot does not proxy on top of weaving).
+             See README "Compile-time weaving (opt-in profile)". -->
+        <profile>
+            <id>aspectj-ctw</id>
+            <dependencies>
+                <dependency>
+                    <groupId>org.aspectj</groupId>
+                    <artifactId>aspectjrt</artifactId>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>aspectj-maven-plugin</artifactId>
+                        <version>1.16.1</version>
+                        <configuration>
+                            <complianceLevel>25</complianceLevel>
+                            <showWeaveInfo>true</showWeaveInfo>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <goals>
+                                    <goal>compile</goal>
+                                    <goal>test-compile</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.aspectj</groupId>
+                                <artifactId>aspectjtools</artifactId>
+                                <version>1.9.25</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                    <!-- Disable Spring proxy auto-creation under weaving, or every advice would run twice. -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <systemPropertyVariables>
+                                <spring.aop.auto>false</spring.aop.auto>
+                            </systemPropertyVariables>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

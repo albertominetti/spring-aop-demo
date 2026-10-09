@@ -67,6 +67,30 @@ Requirements: Java 25, Maven. Built on Spring Boot 4.1.x (Spring Framework 7).
 - MockMvc test support moved out of the test starter → added `spring-boot-starter-webmvc-test` (test scope); `@AutoConfigureMockMvc` is now in `org.springframework.boot.webmvc.test.autoconfigure`.
 - JSON is now Jackson 3 (`tools.jackson.databind`), not Jackson 2 (`com.fasterxml.jackson.databind`).
 
+### Compile-time weaving (opt-in profile)
+
+By default everything above runs on Spring proxies. The `aspectj-ctw` profile switches the *mechanism* to AspectJ compile-time weaving (`ajc` inlines advice into the bytecode, no proxies):
+
+```bash
+mvn -Paspectj-ctw clean verify          # full suite, woven
+SPRING_AOP_AUTO=false mvn -Paspectj-ctw spring-boot:run   # run the app, woven
+```
+
+What the profile does (`pom.xml`): adds the `aspectj-maven-plugin` (`compile` + `test-compile`, `complianceLevel` 25, `showWeaveInfo`), the `aspectjrt` runtime, and sets `spring.aop.auto=false` for tests so Spring doesn't proxy *on top of* the woven advice (every advice would run twice — the audit/timing "exactly one more record" assertions catch that).
+
+Two things a profile alone can't do, so the code is written dual-mode from the start:
+
+- **Aspect instantiation.** Under CTW the AspectJ runtime (not Spring) creates aspect instances, so constructor injection would stay `null`. Aspects therefore look collaborators up via `support/BeanLookup` (a static `ApplicationContext` bridge) instead of `@Autowired` constructors. The `@Component` on aspects is still needed for proxy-mode discovery; in weaving mode that bean just sits idle.
+- **Ordering.** `@Order` is a Spring concept, ignored by `ajc`. The same precedence is declared a second time with `@DeclarePrecedence` — in its own `aspect/AspectPrecedence` class with no `@Component`, because Spring AOP *silently skips* any `@Aspect` carrying `@DeclarePrecedence` (putting it on a real aspect would disable that aspect in proxy mode).
+
+Three more CTW lessons learned the hard way (each found via a failing test):
+
+- **Scope every pointcut with `execution(* *(..))`.** Spring AOP only knows method *execution* join points, but native AspectJ's `@annotation`/`@within`/`within` also match method *calls*, constructors, static initializers and field access. Without the conjunct, every advice ran twice (once at the call site, once at the execution) — the timing/audit "exactly one more record" assertions catch this.
+- **Name annotation attributes explicitly.** `@PathVariable String id` relies on `-parameters` metadata for the name; `ajc` doesn't emit it, so Spring MVC failed with 400. Hence `@PathVariable("id")`.
+- **One shared test context.** `BeanLookup` points at the most recently booted context, so the suite must not boot two (the `@AutoConfigureMockMvc` context vs the plain one). `OrderControllerTest` builds its `MockMvc` manually from the shared `WebApplicationContext` instead — see its javadoc.
+
+Observable differences in weaving mode: beans are plain instances (asserted with `AopUtils.isAopProxy == false` in `CompileTimeWeavingTest`), and `this.` self-calls **are** advised — the bypass test in `SelfInvocationAspectTest` is disabled there via `@DisabledIfSystemProperty`, the `/demo/self-invocation` expectation flips to `true`, and a dedicated `CompileTimeWeavingTest` (enabled only when `spring.aop.auto=false`) proves both facts.
+
 ```bash
 mvn clean verify        # build + all tests
 mvn spring-boot:run     # start the app on http://localhost:8080
