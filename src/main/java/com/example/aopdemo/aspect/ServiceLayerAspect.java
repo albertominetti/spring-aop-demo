@@ -18,6 +18,9 @@ import org.springframework.stereotype.Component;
  * {@code execution(...)}: {@code within()} selects by <b>declaring type</b>,
  * {@code execution()} by method signature (visibility, return type, name,
  * parameters). Here we simply log "some service method is about to run".
+ * The {@code execution(* *(..))} conjunct keeps matching to method executions:
+ * under the AspectJ compiler {@code within(...)} alone would also match
+ * constructors, static initializers and field access.
  *
  * <p>{@code @Order(2)}: runs inside {@link TimingAspect} but outside the
  * audit/exception aspects.
@@ -29,7 +32,7 @@ public class ServiceLayerAspect {
 
     private static final Logger log = LoggerFactory.getLogger(ServiceLayerAspect.class);
 
-    @Before("within(com.example.aopdemo.order..*)")
+    @Before("within(com.example.aopdemo.order..*) && execution(* *(..))")
     public void beforeServiceCall(JoinPoint joinPoint) {
         log.debug("-- service layer entering {}#{}", joinPoint.getSignature().getDeclaringType().getSimpleName(),
                 joinPoint.getSignature().getName());

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -38,6 +39,8 @@ class SelfInvocationAspectTest {
 
     @Test
     @DisplayName("aspect is bypassed by a this.method() self-invocation")
+    @DisabledIfSystemProperty(named = "spring.aop.auto", matches = "false",
+            disabledReason = "proxy-only behaviour: with compile-time weaving self-calls ARE advised")
     void aspectBypassedBySelfInvocation() {
         int before = timingRecorder.countFor(TRACED);
 

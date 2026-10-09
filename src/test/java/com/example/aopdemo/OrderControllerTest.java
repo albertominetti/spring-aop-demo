@@ -6,13 +6,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import com.example.aopdemo.audit.AuditTrailStore;
 import com.example.aopdemo.order.Order;
@@ -22,13 +24,26 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * End-to-end test: the aspects wrap real controller/service calls and the
  * class-level ({@code @within}) audit entries show up as well.
+ *
+ * <p>Note: MockMvc is built manually from the shared {@code WebApplicationContext}
+ * instead of {@code @AutoConfigureMockMvc} so this class reuses the <i>same</i>
+ * Spring context as every other test. That matters because aspects resolve
+ * collaborators through the static {@code BeanLookup}, which always points at
+ * the most recently booted context — a second context would silently divert
+ * all audit/timing records away from the stores under test.
  */
 @SpringBootTest
-@AutoConfigureMockMvc
 class OrderControllerTest {
 
     @Autowired
+    private WebApplicationContext webApplicationContext;
+
     private MockMvc mockMvc;
+
+    @BeforeEach
+    void buildMockMvc() {
+        mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).build();
+    }
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -101,12 +116,21 @@ class OrderControllerTest {
     }
 
     @Test
-    @DisplayName("GET /demo/self-invocation proves that self-invocation bypasses the proxy")
+    @DisplayName("GET /demo/self-invocation reports proxy bypass (or weaving, in CTW mode)")
     void selfInvocationDemo() throws Exception {
         mockMvc.perform(get("/demo/self-invocation"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.callThroughProxy.aspectApplied").value(true))
-                .andExpect(jsonPath("$.selfInvocationThisDotCall.aspectApplied").value(false))
+                .andExpect(jsonPath("$.selfInvocationThisDotCall.aspectApplied").value(compileTimeWeaving()))
                 .andExpect(jsonPath("$.selfInvocationViaInjectedProxy.aspectApplied").value(true));
+    }
+
+    /**
+     * {@code true} only under the {@code aspectj-ctw} profile, which sets
+     * {@code spring.aop.auto=false} as a system property for the test JVM.
+     * With compile-time weaving there is no proxy to bypass, so self-calls are advised.
+     */
+    private static boolean compileTimeWeaving() {
+        return "false".equals(System.getProperty("spring.aop.auto"));
     }
 }
