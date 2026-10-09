@@ -59,7 +59,13 @@ Lower `@Order` value = higher precedence = **outermost** in the chain. The trans
 
 ## Run it
 
-Requirements: Java 17, Maven.
+Requirements: Java 25, Maven. Built on Spring Boot 4.1.x (Spring Framework 7).
+
+### Spring Boot 4 migration notes (upgraded from 3.3.x)
+
+- `spring-boot-starter-aop` no longer exists → replaced by `spring-boot-starter-aspectj`.
+- MockMvc test support moved out of the test starter → added `spring-boot-starter-webmvc-test` (test scope); `@AutoConfigureMockMvc` is now in `org.springframework.boot.webmvc.test.autoconfigure`.
+- JSON is now Jackson 3 (`tools.jackson.databind`), not Jackson 2 (`com.fasterxml.jackson.databind`).
 
 ```bash
 mvn clean verify        # build + all tests
